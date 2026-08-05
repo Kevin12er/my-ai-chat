@@ -7,7 +7,7 @@
     <style>
         * { 
             box-sizing: border-box; 
-            touch-action: manipulation; /* Mencegah double-tap zoom di iOS */
+            touch-action: manipulation;
         }
         
         html, body { 
@@ -18,9 +18,9 @@
             padding: 0;
             width: 100%;
             height: 100%;
-            height: 100dvh; /* Mengikuti tinggi dinamis Safari iOS */
+            height: 100dvh; 
             overflow: hidden; 
-            position: fixed; /* Mencegah seisi halaman bergeser/mentul di iOS */
+            position: fixed; 
         }
 
         body {
@@ -95,8 +95,8 @@
             display: flex; 
             flex-direction: column; 
             gap: 15px; 
-            padding-bottom: 90px; /* Jarak aman agar chat tidak tertutup input */
-            -webkit-overflow-scrolling: touch; /* Fast-scroll untuk iOS */
+            padding-bottom: 90px; 
+            -webkit-overflow-scrolling: touch; 
         }
         .bubble { 
             padding: 12px 16px; 
@@ -125,7 +125,6 @@
             left: 0;
             width: 100%; 
             padding: 12px 15px; 
-            /* Menyesuaikan Safe Area di iPhone X/11/12+ (Safe Area Inset) */
             padding-bottom: calc(12px + env(safe-area-inset-bottom)); 
             background: #18191a; 
             display: flex; 
@@ -142,7 +141,7 @@
             background: #3a3b3c; 
             color: white; 
             outline: none; 
-            font-size: 16px !important; /* Wajib 16px agar Safari tidak auto-zoom */
+            font-size: 16px !important; 
         }
         button#send { 
             background: #0084ff; 
@@ -158,11 +157,13 @@
         /* RESPONSIVE MOBILE */
         @media (max-width: 600px) {
             .sidebar { 
-                width: 55px; 
+                width: 80px; 
                 padding: 5px; 
             }
             .sidebar .history-item { 
-                display: none; /* Sembunyikan judul teks di layar sempit */
+                font-size: 10px;
+                padding: 8px 4px;
+                text-align: center;
             }
             .new-btn { 
                 font-size: 20px !important; 
@@ -170,7 +171,7 @@
                 margin-bottom: 10px;
             }
             .settings-btn {
-                font-size: 9px;
+                font-size: 8px;
                 padding: 4px 2px;
             }
         }
@@ -247,11 +248,13 @@
             box.scrollTop = box.scrollHeight;
         }
 
+        // FUNGSI CHAT BARU DIBERSIHKAN SAMA SEPERTI KODE LAMA
         function createNewChat() {
             currentChatId = 'chat_' + Date.now();
-            allChats[currentChatId] = { title: "New Chat", messages: [] };
+            allChats[currentChatId] = { title: "Chat Baru", messages: [] };
             save();
-            renderMessages();
+            renderMessages(); // Langsung mengosongkan layar chat
+            document.getElementById('user-input').focus();
         }
 
         function loadChat(id) {
@@ -265,7 +268,11 @@
             const text = inp.value.trim();
             if (!text || !API_KEY) return;
 
-            if (!currentChatId) createNewChat();
+            if (!currentChatId || !allChats[currentChatId]) {
+                createNewChat();
+            }
+
+            // Jika pesan pertama di chat baru, perbarui judulnya
             if (allChats[currentChatId].messages.length === 0) {
                 allChats[currentChatId].title = text.substring(0, 15);
             }
@@ -300,8 +307,13 @@
             }
         }
 
-        renderSidebar();
-        renderMessages();
+        // Jalankan saat pertama kali dibuka
+        if (!currentChatId || !allChats[currentChatId]) {
+            createNewChat();
+        } else {
+            renderSidebar();
+            renderMessages();
+        }
     </script>
 </body>
 </html>
