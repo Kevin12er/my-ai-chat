@@ -4,25 +4,21 @@
     <meta charset="UTF-8" />
     <meta
       name="viewport"
-      content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"
+      content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover"
     />
-    <title>AI Chat - Private Key Mode</title>
+    <title>AI Chat - Groq Mode</title>
     <style>
-      * {
-        box-sizing: border-box;
-      }
+      * { box-sizing: border-box; }
+      html, body { width: 100%; height: 100%; margin: 0; padding: 0; }
       body {
-        font-family:
-          -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
         background: #0b0e11;
         color: white;
-        margin: 0;
         display: flex;
         height: 100vh;
+        height: 100dvh;
         overflow: hidden;
       }
-
-      /* SIDEBAR */
       .sidebar {
         width: 260px;
         background: #18191a;
@@ -30,7 +26,6 @@
         display: flex;
         flex-direction: column;
         padding: 10px;
-        transition: 0.3s;
       }
       .new-btn {
         background: #0084ff;
@@ -67,20 +62,19 @@
         background: none;
         border: 1px solid #444;
         color: #888;
-        padding: 5px;
+        padding: 8px;
         cursor: pointer;
-        font-size: 11px;
+        font-size: 12px;
         margin-top: 5px;
         border-radius: 4px;
       }
-
-      /* MAIN CHAT */
       .main {
         flex: 1;
         display: flex;
         flex-direction: column;
         background: #0b0e11;
         position: relative;
+        height: 100%;
       }
       #chat-box {
         flex: 1;
@@ -89,14 +83,16 @@
         display: flex;
         flex-direction: column;
         gap: 15px;
-        padding-bottom: 80px;
+        padding-bottom: 90px;
+        -webkit-overflow-scrolling: touch;
       }
       .bubble {
         padding: 12px 16px;
         border-radius: 18px;
         max-width: 85%;
         line-height: 1.5;
-        font-size: 10px;
+        font-size: 15px;
+        word-break: break-word;
       }
       .user {
         align-self: flex-end;
@@ -109,13 +105,13 @@
         border-bottom-left-radius: 2px;
         border: 1px solid #333;
       }
-
-      /* INPUT AREA */
       .input-area {
         position: absolute;
         bottom: 0;
+        left: 0;
         width: 100%;
         padding: 15px;
+        padding-bottom: calc(15px + env(safe-area-inset-bottom));
         background: #18191a;
         display: flex;
         gap: 10px;
@@ -129,8 +125,8 @@
         background: #3a3b3c;
         color: white;
         outline: none;
-        font-size: 16px;
-      } /* 16px agar iPhone tidak zoom otomatis */
+        font-size: 16px !important;
+      }
       button#send {
         background: #0084ff;
         color: white;
@@ -140,30 +136,16 @@
         cursor: pointer;
         font-weight: bold;
       }
-
-      /* Responsif Mobile */
       @media (max-width: 600px) {
-        .sidebar {
-          width: 60px;
-          padding: 5px;
-        }
-        .sidebar .new-btn,
-        .sidebar .history-item {
-          font-size: 10px;
-          padding: 5px;
-          text-align: center;
-        }
-        .new-btn {
-          font-size: 20px !important;
-        }
+        .sidebar { width: 60px; padding: 5px; }
+        .sidebar .new-btn, .sidebar .history-item { font-size: 10px; padding: 5px; text-align: center; }
+        .new-btn { font-size: 20px !important; }
       }
     </style>
   </head>
   <body>
     <div class="sidebar">
-      <button class="new-btn" onclick="createNewChat()" title="Chat Baru">
-        +
-      </button>
+      <button class="new-btn" onclick="createNewChat()" title="Chat Baru">+</button>
       <div class="history-list" id="history-list"></div>
       <button class="settings-btn" onclick="resetKey()">Reset API Key</button>
     </div>
@@ -174,7 +156,7 @@
         <input
           type="text"
           id="user-input"
-          placeholder="Tanya sesuatu..."
+          placeholder="Ketik pesan..."
           onkeypress="if (event.key === 'Enter') send();"
         />
         <button id="send" onclick="send()">➤</button>
@@ -182,27 +164,26 @@
     </div>
 
     <script>
-      // --- SISTEM KEAMANAN KEY ---
+      // Force Clear Cache Model Lama jika Tersimpan
+      localStorage.removeItem("selected_model");
+
       let API_KEY = localStorage.getItem("groq_api_key");
 
       if (!API_KEY) {
-        API_KEY = prompt(
-          "Website ini Public. Demi keamanan, masukkan API Key Groq kamu di sini (hanya disimpan di browsermu):",
-        );
+        API_KEY = prompt("Masukkan Groq API Key kamu (gsk_...):");
         if (API_KEY) {
           localStorage.setItem("groq_api_key", API_KEY);
-        } else {
-          alert("Tanpa Key, AI tidak bisa menjawab.");
         }
       }
 
       function resetKey() {
-        localStorage.removeItem("groq_api_key");
+        localStorage.clear();
         location.reload();
       }
 
-      // --- SISTEM CHAT ---
-      const MODEL = "mixtral-8x7b-32768";
+      // MODEL RESMI GROQ YANG AKTIF SAAT INI
+      const MODEL = "llama-3.3-70b-versatile";
+
       let allChats = JSON.parse(localStorage.getItem("all_chats")) || {};
       let currentChatId = localStorage.getItem("current_chat_id") || null;
 
@@ -214,6 +195,7 @@
 
       function renderSidebar() {
         const list = document.getElementById("history-list");
+        if (!list) return;
         list.innerHTML = "";
         Object.keys(allChats)
           .sort()
@@ -229,6 +211,7 @@
 
       function renderMessages() {
         const box = document.getElementById("chat-box");
+        if (!box) return;
         box.innerHTML = "";
         if (currentChatId && allChats[currentChatId]) {
           allChats[currentChatId].messages.forEach((m) => {
@@ -243,7 +226,7 @@
 
       function createNewChat() {
         currentChatId = "chat_" + Date.now();
-        allChats[currentChatId] = { title: "New Chat", messages: [] };
+        allChats[currentChatId] = { title: "Chat Baru", messages: [] };
         save();
         renderMessages();
       }
@@ -257,9 +240,17 @@
       async function send() {
         const inp = document.getElementById("user-input");
         const text = inp.value.trim();
-        if (!text || !API_KEY) return;
+        if (!text) return;
 
-        if (!currentChatId) createNewChat();
+        if (!API_KEY) {
+          alert("API Key tidak ditemukan. Klik Reset API Key.");
+          return;
+        }
+
+        if (!currentChatId || !allChats[currentChatId]) {
+          createNewChat();
+        }
+
         if (allChats[currentChatId].messages.length === 0) {
           allChats[currentChatId].title = text.substring(0, 15);
         }
@@ -282,7 +273,7 @@
                 messages: allChats[currentChatId].messages,
                 max_tokens: 1024,
               }),
-            },
+            }
           );
 
           const d = await r.json();
@@ -300,8 +291,12 @@
         }
       }
 
-      renderSidebar();
-      renderMessages();
+      if (!currentChatId || !allChats[currentChatId]) {
+        createNewChat();
+      } else {
+        renderSidebar();
+        renderMessages();
+      }
     </script>
   </body>
 </html>
