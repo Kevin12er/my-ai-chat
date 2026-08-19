@@ -3,10 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>AI Chat - Gemini Mode</title>
+    <title>AI Chat - Gemini 3.6 Fast</title>
     <style>
         * { box-sizing: border-box; }
-        
         body { 
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; 
             background: #0b0e11; 
@@ -17,7 +16,6 @@
             height: 100dvh; 
             overflow: hidden; 
         }
-        
         .sidebar { width: 260px; background: #18191a; border-right: 1px solid #333; display: flex; flex-direction: column; padding: 10px; transition: 0.3s; }
         .new-btn { background: #0084ff; color: white; border: none; padding: 12px; border-radius: 8px; cursor: pointer; font-weight: bold; margin-bottom: 20px; }
         .history-list { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 5px; }
@@ -63,15 +61,12 @@
     <div class="main">
         <div id="chat-box"></div>
         <div class="input-area">
-            <input type="text" id="user-input" placeholder="Tanya Gemini..." onkeypress="if(event.key === 'Enter') send()">
+            <input type="text" id="user-input" placeholder="Tanya AI..." onkeypress="if(event.key === 'Enter') send()">
             <button id="send" onclick="send()">➤</button>
         </div>
     </div>
 
     <script>
-        // Bersihkan memori Groq lama jika ada
-        localStorage.removeItem('groq_api_key');
-
         let API_KEY = localStorage.getItem('gemini_api_key');
 
         if (!API_KEY) {
@@ -88,8 +83,9 @@
             location.reload();
         }
 
-        // MODEL RESMI GEMINI (Gratis & Paling Cepat)
-        const MODEL = "gemini-2.5-flash";
+        // MODEL TERBARU RESMI DAN AKTIF DARI GOOGLE GEMINI
+        const MODEL = "gemini-3.6-flash";
+
         let allChats = JSON.parse(localStorage.getItem('all_chats')) || {};
         let currentChatId = localStorage.getItem('current_chat_id') || null;
 
@@ -158,7 +154,7 @@
             inp.value = '';
             renderMessages();
 
-            // Format Riwayat Chat Sesuai Format Gemini API
+            // Ubah riwayat ke format JSON Gemini API
             const formattedContents = allChats[currentChatId].messages.map(m => ({
                 role: m.role === "user" ? "user" : "model",
                 parts: [{ text: m.content }]
@@ -170,14 +166,21 @@
                     headers: { 
                         "Content-Type": "application/json" 
                     },
-                    body: JSON.stringify({ 
+                    body: JSON.stringify({
+                        // Pengaturan gaya bahasa & optimasi kecepatan
+                        systemInstruction: {
+                            parts: [{ text: "please reply it with fun and keep it short like a real human conversation, you are no longer artificial intelegent but human" }]
+                        },
+                        generationConfig: {
+                            maxOutputTokens: 500 // Membatasi output agar pemrosesan super cepat
+                        },
                         contents: formattedContents
                     })
                 });
-                
+
                 const d = await r.json();
                 if (d.error) throw new Error(d.error.message);
-                
+
                 const reply = d.candidates[0].content.parts[0].text;
                 allChats[currentChatId].messages.push({ role: "assistant", content: reply });
                 save();
