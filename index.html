@@ -28,6 +28,9 @@
         .bubble { padding: 12px 16px; border-radius: 18px; max-width: 85%; line-height: 1.5; font-size: 15px; word-break: break-word; }
         .user { align-self: flex-end; background: #0084ff; border-bottom-right-radius: 2px; }
         .ai { align-self: flex-start; background: #242526; border-bottom-left-radius: 2px; border: 1px solid #333; }
+        .ai.error { border-color: #ff4d4f; color: #ff8787; }
+        .ai.typing::after { content: "▍"; animation: blink 1s infinite; }
+        @keyframes blink { 50% { opacity: 0; } }
 
         .input-area { 
             position: absolute; 
@@ -42,6 +45,7 @@
         }
         input { flex: 1; padding: 12px 18px; border: none; border-radius: 25px; background: #3a3b3c; color: white; outline: none; font-size: 16px !important; }
         button#send { background: #0084ff; color: white; border: none; padding: 0 20px; border-radius: 25px; cursor: pointer; font-weight: bold; }
+        button#send:disabled { background: #555; cursor: not-allowed; }
 
         @media (max-width: 600px) {
             .sidebar { width: 60px; padding: 5px; }
@@ -139,8 +143,14 @@
 
         async function send() {
             const inp = document.getElementById('user-input');
+            const sendBtn = document.getElementById('send');
             const text = inp.value.trim();
-            if (!text || !API_KEY) return;
+            if (!text) return;
+
+            if (!API_KEY) {
+                alert("Belum ada API Key. Klik 'Reset Key' untuk memasukkan API Key Groq kamu.");
+                return;
+            }
 
             if (!currentChatId || !allChats[currentChatId]) {
                 createNewChat();
@@ -152,13 +162,16 @@
 
             allChats[currentChatId].messages.push({ role: "user", content: text });
             inp.value = '';
+            inp.disabled = true;
+            sendBtn.disabled = true;
             renderMessages();
 
             // Bubble AI untuk streaming
             const box = document.getElementById('chat-box');
             const aiBubble = document.createElement('div');
-            aiBubble.className = 'bubble ai';
+            aiBubble.className = 'bubble ai typing';
             box.appendChild(aiBubble);
+            box.scrollTop = box.scrollHeight;
 
             // Format Pesan Khusus Groq (OpenAI Standard Format)
             const messagesPayload = [
@@ -184,36 +197,71 @@
                     })
                 });
 
+                // PENTING: cek dulu apakah request-nya sukses.
+                // Kalau tidak, Groq balikin JSON error biasa (bukan stream),
+                // jadi harus ditangani terpisah supaya errornya kelihatan.
+                if (!response.ok) {
+                    let detail = "";
+                    try {
+                        const errJson = await response.json();
+                        detail = errJson?.error?.message || JSON.stringify(errJson);
+                    } catch {
+                        detail = await response.text();
+                    }
+                    throw new Error(`HTTP ${response.status} - ${detail}`);
+                }
+
                 const reader = response.body.getReader();
                 const decoder = new TextDecoder();
                 let fullReply = "";
+                let buffer = "";
 
                 while (true) {
                     const { done, value } = await reader.read();
                     if (done) break;
 
-                    const chunk = decoder.decode(value);
-                    const lines = chunk.split("\n");
+                    buffer += decoder.decode(value, { stream: true });
+                    const lines = buffer.split("\n");
+                    // Simpan baris terakhir yang mungkin belum lengkap
+                    buffer = lines.pop();
 
                     for (const line of lines) {
-                        if (line.startsWith("data: ") && line !== "data: [DONE]") {
-                            try {
-                                const json = JSON.parse(line.replace("data: ", ""));
-                                const textChunk = json.choices[0]?.delta?.content || "";
-                                fullReply += textChunk;
-                                aiBubble.innerText = fullReply;
-                                box.scrollTop = box.scrollHeight;
-                            } catch (e) {
-                                // Abaikan chunk tidak utuh
-                            }
+                        const trimmed = line.trim();
+                        if (!trimmed.startsWith("data: ")) continue;
+                        const payload = trimmed.slice(6);
+                        if (payload === "[DONE]") continue;
+
+                        try {
+                            const json = JSON.parse(payload);
+                            const textChunk = json.choices?.[0]?.delta?.content || "";
+                            fullReply += textChunk;
+                            aiBubble.innerText = fullReply;
+                            box.scrollTop = box.scrollHeight;
+                        } catch (e) {
+                            // Chunk JSON belum lengkap saat di-split, aman diabaikan
                         }
                     }
                 }
 
+                aiBubble.classList.remove('typing');
+
+                if (!fullReply) {
+                    fullReply = "(Tidak ada balasan dari model — coba lagi.)";
+                    aiBubble.innerText = fullReply;
+                }
+
                 allChats[currentChatId].messages.push({ role: "assistant", content: fullReply });
                 save();
+
             } catch (e) {
-                alert("Error Groq: " + e.message);
+                aiBubble.classList.remove('typing');
+                aiBubble.classList.add('error');
+                aiBubble.innerText = "⚠️ Error: " + e.message;
+                console.error("Groq API error:", e);
+            } finally {
+                inp.disabled = false;
+                sendBtn.disabled = false;
+                inp.focus();
             }
         }
 
